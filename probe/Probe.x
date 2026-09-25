@@ -1,32 +1,43 @@
 #import <Foundation/Foundation.h>
+#import <sys/socket.h>
+#import <netinet/in.h>
+#import <arpa/inet.h>
+#import <unistd.h>
+#import <string.h>
 
-// Maximal-path probe: writes to MULTIPLE absolute paths so a roothide
-// path-redirect can't hide the result. All readable via SSH scope.
+// Socket-based injection probe. Binds a loopback TCP port in the ctor —
+// sandbox-friendly, and unambiguous: if the port answers, the ctor RAN.
+// (File writes can be swallowed by roothide's per-process path redirect.)
 %ctor {
     @autoreleasepool {
-        NSString *bundle = [[NSBundle mainBundle] bundleIdentifier] ?: @"?";
-        NSString *ts = [NSString stringWithFormat:@"%lld",
-                        (long long)([[NSDate date] timeIntervalSince1970]*1000.0)];
-        NSString *line = [NSString stringWithFormat:@"%@ bundle=%@\n", ts, bundle];
-
-        NSArray *paths = @[
-            @"/var/mobile/Documents/jumio_probe_hit.txt",
-            @"/var/jb/jumio_probe_hit.txt",
-            @"/var/tmp/jumio_probe_hit.txt",
-            @"/tmp/jumio_probe_hit.txt"
-        ];
-        for (NSString *p in paths) {
-            NSError *e = nil;
-            BOOL ok = [line writeToFile:p atomically:YES
-                               encoding:NSUTF8StringEncoding error:&e];
-            // Log which path worked + errno-style reason
-            if (!ok) {
-                NSString *why = e ? e.localizedDescription : @"";
-                [[NSString stringWithFormat:@"FAIL %@ %@\n", p, why]
-                 writeToFile:@"/tmp/jumio_probe_fail.txt"
-                  atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        int s = socket(AF_INET, SOCK_STREAM, 0);
+        if (s >= 0) {
+            int one = 1;
+            setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+            struct sockaddr_in a;
+            memset(&a, 0, sizeof(a));
+            a.sin_family = AF_INET;
+            a.sin_port = htons(8799);
+            a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            if (bind(s, (struct sockaddr*)&a, sizeof(a)) == 0) {
+                listen(s, 5);
+                dispatch_async(dispatch_get_global_queue(0,0), ^{
+                    while (1) {
+                        int c = accept(s, NULL, NULL);
+                        if (c >= 0) {
+                            const char *msg = "JumioProbe ctor ran OK\n";
+                            write(c, msg, strlen(msg));
+                            close(c);
+                        }
+                    }
+                });
             }
         }
-        NSLog(@"[JumioProbe] ctor ran bundle=%@", bundle);
+        // Fallback file write
+        NSString *line = [NSString stringWithFormat:@"ctor@%lld bundle=%@\n",
+                          (long long)([[NSDate date] timeIntervalSince1970]*1000.0),
+                          [[NSBundle mainBundle] bundleIdentifier] ?: @"?"];
+        [line writeToFile:@"/var/mobile/Documents/jumio_probe_hit.txt"
+               atomically:YES encoding:NSUTF8StringEncoding error:nil];
     }
 }
