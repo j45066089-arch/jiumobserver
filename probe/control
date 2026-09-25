@@ -1,0 +1,9 @@
+Package: com.maurice.jumioprobe
+Name: JumioProbe
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: Injection probe — writes /var/mobile/Documents/jumioobserver_inject_probe.txt on load.
+Maintainer: Maurice
+Author: Maurice
+Section: Tweaks
+Depends: mobilesubstrate
