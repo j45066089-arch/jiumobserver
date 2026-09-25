@@ -1,0 +1,9 @@
+Package: com.maurice.jumioobserver
+Name: JumioObserver
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: Observe-only KYC diagnostic — dumps final images + metadata sent by PaysafeCard to Jumio. No bypass.
+Maintainer: Maurice
+Author: Maurice
+Section: Tweaks
+Depends: mobilesubstrate

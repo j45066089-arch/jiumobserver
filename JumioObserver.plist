@@ -1,0 +1,6 @@
+{
+    Filter = {
+        Bundles = ( "com.paysafecard.paysafecard" );
+        Executables = ( "PaysafeCard" );
+    };
+}
